@@ -1,12 +1,16 @@
 package main
 
 import (
-	"database/sql"
+	"bufio"
 	"fmt"
+	"io"
+	//"database/sql"
+	"encoding/json"
 	"log"
+	"os"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
+	//_ "github.com/go-sql-driver/mysql"
 
 	"github.com/iakud/crawler"
 )
@@ -27,17 +31,48 @@ func main() {
 	if !ok {
 		log.Fatalln("city not found")
 	}
-	poiIdMap := GetCityMeishiPoiIdMap(client, city.Acronym)
+	log.Println("city:", city.Name)
 
+	poiIdMap := GetCityMeishiPoiIdMap(client, city.Acronym)
 	log.Println("poi num:", len(poiIdMap))
+
+	filename := fmt.Sprintf("%s_meishi_info.txt", city.Acronym)
+	file, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer file.Close()
+	rd := bufio.NewReader(file)
+	for {
+		line, err := rd.ReadBytes('\n')
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			log.Fatalln(err)
+		}
+		meishiInfo := &MeishiInfo{}
+		if err := json.Unmarshal(line, meishiInfo); err != nil {
+			log.Fatalln(err)
+		}
+		delete(poiIdMap, meishiInfo.PoiId)
+	}
+	wr := bufio.NewWriter(file)
+	defer wr.Flush()
 	for poiId, _ := range poiIdMap {
 		meishiInfo := GetMeishiInfo(client, poiId)
-		DBSave(meishiInfo)
+		data, err := json.Marshal(meishiInfo)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		wr.Write(data)
+		wr.WriteByte('\n')
 		log.Println(meishiInfo.PoiId, meishiInfo.Name, meishiInfo.Phone)
 		time.Sleep(time.Second)
 	}
 }
 
+/*
 var defaultDb *sql.DB
 
 func DBSave(meishiInfo *MeishiInfo) {
@@ -77,4 +112,4 @@ func CloseDb() {
 		defaultDb.Close()
 		defaultDb = nil
 	}
-}
+}*/

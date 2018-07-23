@@ -1,9 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"os"
+	"strconv"
 
 	"github.com/iakud/crawler"
 )
@@ -11,10 +15,37 @@ import (
 type CityMeishiPoiIdMap map[int64]struct{}
 
 func GetCityMeishiPoiIdMap(client *crawler.Client, acronym string) CityMeishiPoiIdMap {
+	filename := fmt.Sprintf("%s_meishi_poiid.txt", acronym)
+	file, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR, 0666)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer file.Close()
+
+	poiIdMap := make(CityMeishiPoiIdMap)
+	rd := bufio.NewReader(file)
+	for {
+		line, err := rd.ReadString('\n')
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			log.Fatalln(err)
+		}
+		poiId, err := strconv.ParseInt(line, 10, 64)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		poiIdMap[poiId] = struct{}{}
+	}
+
+	if len(poiIdMap) > 0 {
+		return poiIdMap
+	}
+
 	url := fmt.Sprintf("http://%v.meituan.com/meishi/", acronym)
 	cityMeishi := getCityMeishi(client, url)
 
-	poiIdMap := make(CityMeishiPoiIdMap)
 	if cityMeishi.PoiLists.TotalCounts < 1000 {
 		pagePoiIdMap := getCityMeishiPagePoiIdMap(client, url)
 		for poiId, _ := range pagePoiIdMap {
@@ -32,6 +63,12 @@ func GetCityMeishiPoiIdMap(client *crawler.Client, acronym string) CityMeishiPoi
 			}
 			log.Println(cate.Name, len(catePoiIdMap))
 		}
+	}
+	wr := bufio.NewWriter(file)
+	defer wr.Flush()
+	for poiId, _ := range poiIdMap {
+		wr.WriteString(strconv.FormatInt(poiId, 10))
+		wr.WriteByte('\n')
 	}
 	return poiIdMap
 }
