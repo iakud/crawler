@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"math/rand"
 	//"database/sql"
 	"encoding/json"
 	"log"
@@ -68,8 +69,9 @@ func main() {
 		}
 		wr.Write(data)
 		wr.WriteByte('\n')
+		wr.Flush()
 		log.Println(meishiInfo.PoiId, meishiInfo.Name, meishiInfo.Phone)
-		time.Sleep(time.Second)
+		time.Sleep(time.Second + time.Millisecond*time.Duration(rand.Int31n(1000)))
 	}
 }
 
