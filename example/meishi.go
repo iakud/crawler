@@ -25,14 +25,14 @@ func GetCityMeishiPoiIdMap(client *crawler.Client, acronym string) CityMeishiPoi
 	poiIdMap := make(CityMeishiPoiIdMap)
 	rd := bufio.NewReader(file)
 	for {
-		line, err := rd.ReadString('\n')
+		line, _, err := rd.ReadLine()
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
 			log.Fatalln(err)
 		}
-		poiId, err := strconv.ParseInt(line, 10, 64)
+		poiId, err := strconv.ParseInt(string(line), 10, 64)
 		if err != nil {
 			log.Fatalln(err)
 		}

@@ -43,7 +43,7 @@ func main() {
 	defer file.Close()
 	rd := bufio.NewReader(file)
 	for {
-		line, err := rd.ReadBytes('\n')
+		line, _, err := rd.ReadLine()
 		if err != nil {
 			if err == io.EOF {
 				break
