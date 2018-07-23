@@ -34,7 +34,6 @@ func main() {
 	log.Println("city:", city.Name)
 
 	poiIdMap := GetCityMeishiPoiIdMap(client, city.Acronym)
-	log.Println("poi num:", len(poiIdMap))
 
 	filename := fmt.Sprintf("%s_meishi_info.txt", city.Acronym)
 	file, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
@@ -57,6 +56,8 @@ func main() {
 		}
 		delete(poiIdMap, meishiInfo.PoiId)
 	}
+	log.Println("poi num:", len(poiIdMap))
+
 	wr := bufio.NewWriter(file)
 	defer wr.Flush()
 	for poiId, _ := range poiIdMap {
