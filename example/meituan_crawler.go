@@ -34,7 +34,7 @@ func main() {
 		meishiInfo := GetMeishiInfo(client, poiId)
 		DBSave(meishiInfo)
 		log.Println(meishiInfo.PoiId, meishiInfo.Name, meishiInfo.Phone)
-		time.Sleep(time.Millisecond * 100)
+		time.Sleep(time.Second)
 	}
 }
 
