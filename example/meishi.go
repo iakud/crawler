@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -14,11 +15,11 @@ import (
 
 type CityMeishiPoiIdMap map[int64]struct{}
 
-func GetCityMeishiPoiIdMap(client *crawler.Client, acronym string) CityMeishiPoiIdMap {
+func GetCityMeishiPoiIdMap(client *crawler.Client, acronym string) (CityMeishiPoiIdMap, error) {
 	filename := fmt.Sprintf("%s_meishi_poiid.txt", acronym)
 	file, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR, 0666)
 	if err != nil {
-		log.Fatalln(err)
+		return nil, err
 	}
 	defer file.Close()
 
@@ -40,14 +41,20 @@ func GetCityMeishiPoiIdMap(client *crawler.Client, acronym string) CityMeishiPoi
 	}
 
 	if len(poiIdMap) > 0 {
-		return poiIdMap
+		return poiIdMap, nil
 	}
 
 	url := fmt.Sprintf("http://%v.meituan.com/meishi/", acronym)
-	cityMeishi := getCityMeishi(client, url)
+	cityMeishi, err := getCityMeishi(client, url)
+	if err != nil {
+		return nil, err
+	}
 
 	if cityMeishi.PoiLists.TotalCounts < 1000 {
-		pagePoiIdMap := getCityMeishiPagePoiIdMap(client, url)
+		pagePoiIdMap, err := getCityMeishiPagePoiIdMap(client, url)
+		if err != nil {
+			return nil, err
+		}
 		for poiId, _ := range pagePoiIdMap {
 			if _, ok := poiIdMap[poiId]; !ok {
 				poiIdMap[poiId] = struct{}{}
@@ -55,7 +62,10 @@ func GetCityMeishiPoiIdMap(client *crawler.Client, acronym string) CityMeishiPoi
 		}
 	} else {
 		for _, cate := range cityMeishi.Filters.Cates {
-			catePoiIdMap := getCityMeishiCatePoiIdMap(client, cate.Url)
+			catePoiIdMap, err := getCityMeishiCatePoiIdMap(client, cate.Url)
+			if err != nil {
+				return nil, err
+			}
 			for poiId, _ := range catePoiIdMap {
 				if _, ok := poiIdMap[poiId]; !ok {
 					poiIdMap[poiId] = struct{}{}
@@ -70,14 +80,20 @@ func GetCityMeishiPoiIdMap(client *crawler.Client, acronym string) CityMeishiPoi
 		wr.WriteString(strconv.FormatInt(poiId, 10))
 		wr.WriteByte('\n')
 	}
-	return poiIdMap
+	return poiIdMap, nil
 }
 
-func getCityMeishiCatePoiIdMap(client *crawler.Client, url string) CityMeishiPoiIdMap {
-	cityMeishi := getCityMeishi(client, url)
+func getCityMeishiCatePoiIdMap(client *crawler.Client, url string) (CityMeishiPoiIdMap, error) {
+	cityMeishi, err := getCityMeishi(client, url)
+	if err != nil {
+		return nil, err
+	}
 	poiIdMap := make(CityMeishiPoiIdMap)
 	if cityMeishi.PoiLists.TotalCounts < 1000 {
-		pagePoiIdMap := getCityMeishiPagePoiIdMap(client, url)
+		pagePoiIdMap, err := getCityMeishiPagePoiIdMap(client, url)
+		if err != nil {
+			return nil, err
+		}
 		for poiId, _ := range pagePoiIdMap {
 			if _, ok := poiIdMap[poiId]; !ok {
 				poiIdMap[poiId] = struct{}{}
@@ -85,9 +101,15 @@ func getCityMeishiCatePoiIdMap(client *crawler.Client, url string) CityMeishiPoi
 		}
 	} else {
 		for _, area := range cityMeishi.Filters.Areas {
-			areaCityMeishi := getCityMeishi(client, area.Url)
+			areaCityMeishi, err := getCityMeishi(client, area.Url)
+			if err != nil {
+				return nil, err
+			}
 			if areaCityMeishi.PoiLists.TotalCounts < 1000 {
-				pagePoiIdMap := getCityMeishiPagePoiIdMap(client, area.Url)
+				pagePoiIdMap, err := getCityMeishiPagePoiIdMap(client, area.Url)
+				if err != nil {
+					return nil, err
+				}
 				for poiId, _ := range pagePoiIdMap {
 					if _, ok := poiIdMap[poiId]; !ok {
 						poiIdMap[poiId] = struct{}{}
@@ -96,7 +118,10 @@ func getCityMeishiCatePoiIdMap(client *crawler.Client, url string) CityMeishiPoi
 				log.Println(area.Name, len(pagePoiIdMap))
 			} else {
 				for _, subArea := range area.SubAreas {
-					pagePoiIdMap := getCityMeishiPagePoiIdMap(client, subArea.Url)
+					pagePoiIdMap, err := getCityMeishiPagePoiIdMap(client, subArea.Url)
+					if err != nil {
+						return nil, err
+					}
 					for poiId, _ := range pagePoiIdMap {
 						if _, ok := poiIdMap[poiId]; !ok {
 							poiIdMap[poiId] = struct{}{}
@@ -106,14 +131,17 @@ func getCityMeishiCatePoiIdMap(client *crawler.Client, url string) CityMeishiPoi
 			}
 		}
 	}
-	return poiIdMap
+	return poiIdMap, nil
 }
 
-func getCityMeishiPagePoiIdMap(client *crawler.Client, url string) CityMeishiPoiIdMap {
+func getCityMeishiPagePoiIdMap(client *crawler.Client, url string) (CityMeishiPoiIdMap, error) {
 	poiIdMap := make(CityMeishiPoiIdMap)
 	for i := 1; i <= 32; i++ {
 		pageUrl := fmt.Sprintf("%spn%v/", url, i)
-		cityMeishi := getCityMeishi(client, pageUrl)
+		cityMeishi, err := getCityMeishi(client, pageUrl)
+		if err != nil {
+			return nil, err
+		}
 		if len(cityMeishi.PoiLists.PoiInfos) == 0 {
 			break
 		}
@@ -121,23 +149,23 @@ func getCityMeishiPagePoiIdMap(client *crawler.Client, url string) CityMeishiPoi
 			poiIdMap[poiInfo.PoiId] = struct{}{}
 		}
 	}
-	return poiIdMap
+	return poiIdMap, nil
 }
 
-func getCityMeishi(client *crawler.Client, url string) *CityMeishi {
+func getCityMeishi(client *crawler.Client, url string) (*CityMeishi, error) {
 	document, err := client.Get(url)
 	if err != nil {
-		log.Fatalln(err)
+		return nil, err
 	}
 	datas, ok := document.Find("window._appState = (.*);")
 	if !ok {
-		log.Fatalln("city meishi not found", url)
+		return nil, errors.New("city meishi not found")
 	}
 	cityMeishi := &CityMeishi{}
 	if err := json.Unmarshal([]byte(datas[0]), cityMeishi); err != nil {
-		log.Fatalln(err)
+		return nil, err
 	}
-	return cityMeishi
+	return cityMeishi, nil
 }
 
 // 分类
@@ -169,23 +197,23 @@ type CityMeishi struct {
 	} `json:"poiLists"`
 }
 
-func GetMeishiInfo(client *crawler.Client, poiId int64) *MeishiInfo {
+func GetMeishiInfo(client *crawler.Client, poiId int64) (*MeishiInfo, error) {
 	url := fmt.Sprintf("http://www.meituan.com/meishi/%v/", poiId)
 	document, err := client.Get(url)
 	if err != nil {
-		log.Fatalln(err)
+		return nil, err
 	}
 	datas, ok := document.Find("window._appState = (.*);")
 	if !ok {
-		log.Fatalln("city meishi not found", url)
+		return nil, fmt.Errorf("meishi not found, url=%v", url)
 	}
 	meishiAppState := &struct {
 		DetailInfo *MeishiInfo `json:"detailInfo"`
 	}{}
 	if err := json.Unmarshal([]byte(datas[0]), meishiAppState); err != nil {
-		log.Fatalln(err)
+		return nil, err
 	}
-	return meishiAppState.DetailInfo
+	return meishiAppState.DetailInfo, nil
 }
 
 type MeishiInfo struct {

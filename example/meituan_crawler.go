@@ -11,12 +11,14 @@ import (
 	"os"
 	"time"
 
+	"github.com/tealeg/xlsx"
+
 	//_ "github.com/go-sql-driver/mysql"
 
 	"github.com/iakud/crawler"
 )
 
-func main() {
+func createClient(proxy string) *crawler.Client {
 	client := crawler.NewClient()
 	client.Header.Add("Connection", "keep-alive")
 	client.Header.Add("Upgrade-Insecure-Requests", "1")
@@ -24,17 +26,31 @@ func main() {
 	client.Header.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8")
 	// client.Header.Add("Accept-Encoding", "gzip, deflate")
 	client.Header.Add("Accept-Language", "zh-CN,zh;q=0.9")
-
+	if len(proxy) > 0 {
+		client.SetProxy(proxy)
+	}
 	// cache cookie
 	client.Head("http://www.meituan.com/")
-	cityMap := GetCityMap(client)
+	return client
+}
+
+func main() {
+	client := createClient("")
+
+	cityMap, err := GetCityMap(client)
+	if err != nil {
+		log.Fatalln(err)
+	}
 	city, ok := cityMap["上海"]
 	if !ok {
 		log.Fatalln("city not found")
 	}
 	log.Println("city:", city.Name)
 
-	poiIdMap := GetCityMeishiPoiIdMap(client, city.Acronym)
+	poiIdMap, err := GetCityMeishiPoiIdMap(client, city.Acronym)
+	if err != nil {
+		log.Fatalln(err)
+	}
 
 	filename := fmt.Sprintf("%s_meishi_info.txt", city.Acronym)
 	file, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
@@ -42,6 +58,15 @@ func main() {
 		log.Fatalln(err)
 	}
 	defer file.Close()
+
+	xlsxFile := xlsx.NewFile()
+	sheet, err := xlsxFile.AddSheet("美食")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	row := sheet.AddRow()
+	title := []string{"商户Id", "商户名称", "评分", "地址", "电话", "食品安全档案", "人均", "品牌Id", "品牌名称", "显示状态", "美食"}
+	row.WriteSlice(&title, len(title))
 	rd := bufio.NewReader(file)
 	for {
 		line, _, err := rd.ReadLine()
@@ -56,22 +81,60 @@ func main() {
 			log.Fatalln(err)
 		}
 		delete(poiIdMap, meishiInfo.PoiId)
+
+		row := sheet.AddRow()
+		row.AddCell().SetInt64(meishiInfo.PoiId)
+		row.AddCell().SetString(meishiInfo.Name)
+		row.AddCell().SetFloat(float64(meishiInfo.AvgScore))
+		row.AddCell().SetString(meishiInfo.Address)
+		row.AddCell().SetString(meishiInfo.Phone)
+		row.AddCell().SetBool(meishiInfo.HasFoodSafeInfo)
+		row.AddCell().SetInt(meishiInfo.AvgPrice)
+		row.AddCell().SetInt(meishiInfo.BrandId)
+		row.AddCell().SetString(meishiInfo.BrandName)
+		row.AddCell().SetInt(meishiInfo.ShowStatus)
+		row.AddCell().SetBool(meishiInfo.IsMeishi)
 	}
+	xlsxFile.Save("meishi.xlsx")
 	log.Println("poi num:", len(poiIdMap))
 
 	wr := bufio.NewWriter(file)
 	defer wr.Flush()
-	for poiId, _ := range poiIdMap {
-		meishiInfo := GetMeishiInfo(client, poiId)
-		data, err := json.Marshal(meishiInfo)
-		if err != nil {
-			log.Fatalln(err)
+
+	proxy_client := createClient("//127.0.0.1:1080")
+	count := 0
+	totalCount := 0
+	for len(poiIdMap) > 0 {
+		for poiId, _ := range poiIdMap {
+			meishiInfo, err := GetMeishiInfo(client, poiId)
+			if err != nil {
+				log.Println(err, totalCount)
+				// time.Sleep(time.Second * 5)
+				continue
+			}
+			data, err := json.Marshal(meishiInfo)
+			if err != nil {
+				log.Println(err, totalCount)
+				// time.Sleep(time.Second * 5)
+				continue
+			}
+			wr.Write(data)
+			wr.WriteByte('\n')
+			wr.Flush()
+			delete(poiIdMap, poiId)
+			count++
+			totalCount++
+			log.Println(meishiInfo.PoiId, meishiInfo.Name, meishiInfo.Phone)
+			time.Sleep(time.Millisecond*100 + time.Millisecond*time.Duration(rand.Int31n(100)))
+			client, proxy_client = proxy_client, client // swap
+			if count > 200 {
+				log.Println("reset all client")
+				time.Sleep(time.Second * 15)
+				client = createClient("")
+				proxy_client = createClient("//127.0.0.1:1080")
+				count = 0
+			}
 		}
-		wr.Write(data)
-		wr.WriteByte('\n')
-		wr.Flush()
-		log.Println(meishiInfo.PoiId, meishiInfo.Name, meishiInfo.Phone)
-		time.Sleep(time.Second + time.Millisecond*time.Duration(rand.Int31n(1000)))
 	}
 }
 
