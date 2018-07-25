@@ -1,9 +1,6 @@
 package main
 
 import (
-	"encoding/json"
-	"errors"
-
 	"github.com/iakud/crawler"
 )
 
@@ -18,38 +15,8 @@ func NewMeituan() *Meituan {
 	return meituan
 }
 
-func (this *Meituan) GetCityList() (CityList, error) {
-	url := "http://www.meituan.com/changecity/"
-	document, err := this.client.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	datas, ok := document.Find("window.AppData = (.*);")
-	if !ok {
-		return nil, errors.New("city list not found")
-	}
-	appData := &struct {
-		OpenCityList [][]interface{} `json:"openCityList"`
-	}{}
-	if err := json.Unmarshal([]byte(datas[0]), appData); err != nil {
-		return nil, err
-	}
-	var cityList CityList
-	for _, openCity := range appData.OpenCityList {
-		if len(openCity) < 2 {
-			return nil, errors.New("city list not found")
-		}
-		data, err := json.Marshal(openCity[1])
-		if err != nil {
-			return nil, err
-		}
-		var citys []*City
-		if err := json.Unmarshal(data, &citys); err != nil {
-			return nil, err
-		}
-		cityList = append(cityList, citys...)
-	}
-	return cityList, nil
+func (this *Meituan) HeadMainPage() {
+	this.client.Head("http://www.meituan.com/")
 }
 
 func newDefaultClient() *crawler.Client {
