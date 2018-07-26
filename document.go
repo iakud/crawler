@@ -19,14 +19,28 @@ func NewDocument(root *html.Node) *Document {
 
 func (this *Document) Find(pattern string) ([]string, bool) {
 	r := regexp.MustCompile(pattern)
+	var result []string
+	ret := this.walkNode(func(node *html.Node) bool {
+		ret := r.FindStringSubmatch(node.Data)
+		if len(ret) > 0 && ret[0] == node.Data {
+			result = ret[1:]
+			return true
+		}
+		return false
+	})
+	return result, ret
+}
 
-	var stack []*html.Node
-	stack = append(stack, this.root) // push
+func (this *Document) walkNode(walkFunc func(node *html.Node) bool) bool {
+	if walkFunc == nil {
+		return false
+	}
+	stack := []*html.Node{this.root} // init stack
 	for len(stack) > 0 {
 		node := stack[len(stack)-1]
 		stack = stack[:len(stack)-1] // pop
-		if ret := r.FindStringSubmatch(node.Data); ret != nil {
-			return ret[1:], true
+		if walkFunc(node) {
+			return true
 		}
 		if child := node.FirstChild; child != nil {
 			stack = append(stack, child) // push
@@ -35,5 +49,5 @@ func (this *Document) Find(pattern string) ([]string, bool) {
 			stack = append(stack, sibling) // push
 		}
 	}
-	return nil, false
+	return false
 }

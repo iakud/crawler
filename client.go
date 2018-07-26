@@ -1,8 +1,8 @@
 package crawler
 
 import (
-	"log"
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
 
 	"golang.org/x/net/html"
@@ -10,42 +10,34 @@ import (
 
 type Client struct {
 	httpClient *http.Client
-
-	Header  http.Header
-	cookies map[string]*http.Cookie
+	Header     http.Header
 }
 
 func NewClient() *Client {
 	client := &Client{
-		httpClient: &http.Client{},
-
-		Header:  make(http.Header),
-		cookies: make(map[string]*http.Cookie),
+		httpClient: newHttpClient(),
+		Header:     make(http.Header),
 	}
 	return client
 }
 
 // 设置代理
-func (this *Client) SetProxy(rawurl string) {
-	u, err := url.Parse(rawurl)
+func (this *Client) SetProxy(proxyURL string) error {
+	u, err := url.Parse(proxyURL)
 	if err != nil {
-		log.Println(err)
-		return
+		return err
 	}
 	transport := &http.Transport{
 		Proxy: http.ProxyURL(u),
 	}
 	this.httpClient.Transport = transport
+	return nil
 }
 
 func (this *Client) Head(url string) error {
-	resp, err := this.httpClient.Head(url)
+	_, err := this.httpClient.Head(url)
 	if err != nil {
 		return err
-	}
-	// save cookie
-	for _, cookie := range resp.Cookies() {
-		this.cookies[cookie.Name] = cookie
 	}
 	return nil
 }
@@ -75,15 +67,20 @@ func (this *Client) newRequest(method string, url string) (*http.Request, error)
 	if err != nil {
 		return nil, err
 	}
-	// set headers
-	for key, values := range this.Header {
-		for _, value := range values {
-			req.Header.Add(key, value)
-		}
-	}
-	// set cookies
-	for _, cookie := range this.cookies {
-		req.AddCookie(cookie)
-	}
+	this.copyHeaders(req)
 	return req, nil
+}
+
+func (this *Client) copyHeaders(req *http.Request) {
+	for key, values := range this.Header {
+		req.Header[key] = values
+	}
+}
+
+func newHttpClient() *http.Client {
+	httpClient := new(http.Client)
+	if jar, err := cookiejar.New(nil); err == nil {
+		httpClient.Jar = jar
+	}
+	return httpClient
 }
