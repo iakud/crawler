@@ -8,16 +8,24 @@ import (
 
 func main() {
 	meituan := NewMeituan()
-	meituan.HeadMainPage()
-	cityList, err := meituan.GetCityList()
+	meituan.HeadHome() // for set cookie
+
+	cityList, err := LoadCityList("citylist.txt")
 	if err != nil {
-		log.Fatalln(err)
+		cityList, err = meituan.GetCityList()
+		if err != nil {
+			log.Fatalln(err)
+		}
+		if err := cityList.Save("citylist.txt"); err != nil {
+			log.Fatalln(err)
+		}
 	}
 	city := cityList.GetCity("上海")
 	if city == nil {
 		log.Fatalln("city not found")
 	}
 	fmt.Println(city.Id, city.Name, city.Acronym)
+
 	if err := meituan.WalkMeishi(city.Acronym, func(poiInfos []*MeishiPoiInfoData) {
 		for _, poiInfo := range poiInfos {
 			detailInfo, err := meituan.GetMeishiDetailInfo(poiInfo.PoiId)

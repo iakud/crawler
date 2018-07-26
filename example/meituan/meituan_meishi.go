@@ -170,7 +170,7 @@ func (this *Meituan) getMeishiData(url string) (*MeishiData, error) {
 	}
 	datas, ok := document.Find("window._appState = (.*);")
 	if !ok {
-		return nil, fmt.Errorf("meishi list not found, url=%v", url)
+		return nil, fmt.Errorf("meishi data not found, url=%v", url)
 	}
 	appData := &MeishiData{}
 	if err := json.Unmarshal([]byte(datas[0]), appData); err != nil {
@@ -180,18 +180,17 @@ func (this *Meituan) getMeishiData(url string) (*MeishiData, error) {
 }
 
 type MeishiDetailInfoData struct {
-	PoiId    int64   `json:"poiId"`
-	Name     string  `json:"name"`
-	AvgScore float32 `json:"avgScore"`
-	Address  string  `json:"address"`
-	Phone    string  `json:"phone"`
-
-	HasFoodSafeInfo bool   `json:"hasFoodSafeInfo"`
-	AvgPrice        int    `json:"avgPrice"`
-	BrandId         int    `json:"brandId"`
-	BrandName       string `json:"brandName"`
-	ShowStatus      int    `json:"showStatus"`
-	IsMeishi        bool   `json:"isMeishi"`
+	PoiId           int64   `json:"poiId"`
+	Name            string  `json:"name"`
+	AvgScore        float32 `json:"avgScore"`
+	Address         string  `json:"address"`
+	Phone           string  `json:"phone"`
+	HasFoodSafeInfo bool    `json:"hasFoodSafeInfo"`
+	AvgPrice        int     `json:"avgPrice"`
+	BrandId         int     `json:"brandId"`
+	BrandName       string  `json:"brandName"`
+	ShowStatus      int     `json:"showStatus"`
+	IsMeishi        bool    `json:"isMeishi"`
 }
 
 func (this *Meituan) GetMeishiDetailInfo(poiId int64) (*MeishiDetailInfoData, error) {

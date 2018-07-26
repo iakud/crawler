@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/gob"
 	"encoding/json"
 	"errors"
+	"os"
 )
 
 type CityData struct {
@@ -15,7 +17,7 @@ type CityList struct {
 	citys []*CityData
 }
 
-func (this CityList) GetCity(name string) *CityData {
+func (this *CityList) GetCity(name string) *CityData {
 	for _, city := range this.citys {
 		if city.Name == name {
 			return city
@@ -24,10 +26,34 @@ func (this CityList) GetCity(name string) *CityData {
 	return nil
 }
 
-func (this CityList) GetCitys() []*CityData {
+func (this *CityList) GetCitys() []*CityData {
 	var citys []*CityData
 	citys = append(citys, this.citys...)
 	return citys
+}
+
+func (this *CityList) Save(filename string) error {
+	file, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	w := gob.NewEncoder(file)
+	return w.Encode(&this.citys)
+}
+
+func LoadCityList(filename string) (*CityList, error) {
+	file, err := os.OpenFile(filename, os.O_RDONLY, 0666)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	r := gob.NewDecoder(file)
+	var citys []*CityData
+	if err := r.Decode(&citys); err != nil {
+		return nil, err
+	}
+	return &CityList{citys}, nil
 }
 
 func (this *Meituan) GetCityList() (*CityList, error) {
