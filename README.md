@@ -1,5 +1,5 @@
-# crawler
----
+# crawler [![Build Status](https://travis-ci.org/iakud/crawler.svg?branch=master)](https://travis-ci.org/iakud/crawler)
+
 **网络爬虫程序**
 
 - `client` 从网页抓取数据
